@@ -220,10 +220,6 @@
             <div>
                 <div class="pill">展平后的行向量 (1×784)</div>
                 <canvas id="flatRowCanvas" width="220" height="30"></canvas>
-                <p class="muted" style="max-width:260px;">
-                展平方式：按 <span class="highlight">行</span> 展平（row-major）。<br>
-                可先看作 1×784 的行向量，再转置为 784×1 的列向量参与矩阵乘法。
-                </p>
             </div>
             <div class="arrow">→</div>
             <div>
@@ -232,6 +228,10 @@
             </div>
         </div>
     </div>
+                    <p class="muted">
+                展平方式：按 <span class="highlight">行</span> 展平。<br>
+                可先看作 1×784 的行向量，再转置为 784×1 的列向量参与矩阵乘法。
+                </p>
   </section>
 
     <!-- 放在 Step 3 前面 -->
