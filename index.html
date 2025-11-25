@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <title>MNIST 手写数字识别 · 矩阵乘法可视化</title>
-  <link rel="icon" type="image/png" href="catt.png">
+    <link rel="icon" type="image/png" href="catt.png?v=2">
+
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -17,7 +18,11 @@
       color: #f9fafb;
       padding: 16px 24px;
     }
-    header h1 {
+    header h1 {.col {
+      display: flex;
+      flex-direction: column;
+      justify-content: center; /* 垂直居中这一列里的内容 */
+    }
       margin: 0 0 4px;
       font-size: 20px;
     }
@@ -54,6 +59,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 16px;
+      align-items: center;
     }
     .sample-list {
       display: flex;
@@ -199,7 +205,6 @@
   <!-- STEP 1: 选择样本 -->
   <section class="panel">
     <div class="step-label">Step 1 · 选择一张 MNIST 数字图像</div>
-    <p class="muted">样本来自 MNIST（由离线 Python 脚本生成 <code>mnist_samples.json</code>）。</p>
     <div id="sampleList" class="sample-list"></div>
   </section>
 
@@ -207,25 +212,24 @@
   <section class="panel">
     <div class="step-label">Step 2 · 28×28 矩阵展平成 784×1 列向量</div>
         <div class="flex-row">
-        <div>
-            <div class="pill">原始图像 28×28</div>
-            <canvas id="imageCanvas" width="140" height="140"></canvas>
-        </div>
-        <div class="arrow">→</div>
-        <div>
-            <div class="pill">展平后的行向量 (1×784)</div>
-            <canvas id="flatRowCanvas" width="220" height="30"></canvas>
-
-            <div style="height:8px;"></div>
-
-            <div class="pill">作为列向量的 x ∈ ℝ^(784×1)</div>
-            <canvas id="flatCanvas" width="30" height="220"></canvas>
-
-            <p class="muted" style="max-width:260px;">
-            展平方式：按 <span class="highlight">行</span> 展平（row-major）。<br>
-            可先看作 1×784 的行向量，再转置为 784×1 的列向量参与矩阵乘法。
-            </p>
-        </div>
+            <div>
+                <div class="pill">原始图像 28×28</div>
+                <canvas id="imageCanvas" width="140" height="140"></canvas>
+            </div>
+            <div class="arrow">→</div>
+            <div>
+                <div class="pill">展平后的行向量 (1×784)</div>
+                <canvas id="flatRowCanvas" width="220" height="30"></canvas>
+                <p class="muted" style="max-width:260px;">
+                展平方式：按 <span class="highlight">行</span> 展平（row-major）。<br>
+                可先看作 1×784 的行向量，再转置为 784×1 的列向量参与矩阵乘法。
+                </p>
+            </div>
+            <div class="arrow">→</div>
+            <div>
+                <div class="pill">作为列向量的 x ∈ ℝ^(784×1)</div>
+                <canvas id="flatCanvas" width="30" height="220"></canvas>
+            </div>
         </div>
     </div>
   </section>
@@ -234,9 +238,8 @@
   <section class="panel">
     <div class="step-label">STEP 3 · 权重模式</div>
     <p class="muted">
-      选择本页面使用的 MLP 权重：<br>
       - 随机初始化：用于展示「模型还没学会时」的矩阵乘法效果<br>
-      - 训练好的权重：用于展示真实识别效果（来自 <code>mlp_weights.json</code>）
+      - 训练好的权重：用于展示真实识别效果
     </p>
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
       <div>
@@ -256,11 +259,10 @@
     <div class="step-label">Step 4 · 第一层全连接：W₁ · x + b₁</div>
 <p class="muted">
   第一层维度：<code>W₁ ∈ ℝ^(16×784), b₁ ∈ ℝ^(16)</code>，激活函数 ReLU。<br>
-  当前使用的权重模式见上方「Global · 权重模式」格子。
 </p>
 
-    <button id="btnInit" class="btn">① 初始化/加载权重并计算第一层</button>
-    <button id="btnShowNeuron" class="btn secondary" disabled>② 展示第一个神经元的计算公式</button>
+    <button id="btnInit" class="btn">初始化/加载权重并计算第一层</button>
+    <button id="btnShowNeuron" class="btn secondary" disabled>展示第一个神经元的计算公式</button>
 
     <div class="flex-row" style="margin-top:12px;">
       <div>
@@ -293,7 +295,7 @@
       <code>z = W₂ · h₁ + b₂, &nbsp; y = softmax(z)</code>，其中 y 的 10 个分量对应数字 0–9 的概率。
     </p>
 
-    <button id="btnForwardAll" class="btn" disabled>③ 计算第二层并展示最终输出</button>
+    <button id="btnForwardAll" class="btn" disabled>计算第二层并展示最终输出</button>
 
     <div id="layer2Info" class="matrix-info"></div>
     <div id="logitsInfo" class="matrix-info"></div>
