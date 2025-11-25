@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>MNIST 手写数字识别 · 矩阵乘法可视化</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    header {
+      background: #111827;
+      color: #f9fafb;
+      padding: 16px 24px;
+    }
+    header h1 {
+      margin: 0 0 4px;
+      font-size: 20px;
+    }
+    header p {
+      margin: 0;
+      font-size: 13px;
+      opacity: 0.8;
+    }
+    main {
+      padding: 16px 24px 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .panel {
+      background: white;
+      border-radius: 12px;
+      padding: 16px 16px 20px;
+      margin-top: 12px;
+      box-shadow: 0 8px 20px rgba(15,23,42,0.06);
+    }
+    .step-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 4px;
+    }
+    .muted {
+      color: #6b7280;
+      font-size: 12px;
+    }
+    .flex-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .sample-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .sample-card {
+      border-radius: 10px;
+      padding: 8px;
+      border: 2px solid transparent;
+      background: #f9fafb;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      min-width: 70px;
+      transition: all .12s ease-out;
+    }
+    .sample-card.selected {
+      border-color: #2563eb;
+      background: #eff6ff;
+      box-shadow: 0 0 0 1px rgba(37,99,235,0.25);
+    }
+    .sample-card span {
+      font-size: 12px;
+      color: #374151;
+    }
+    canvas {
+      image-rendering: pixelated;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      background: white;
+    }
+    .arrow {
+      font-size: 24px;
+      margin: auto 4px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 11px;
+      font-weight: 500;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+    .highlight {
+      color: #2563eb;
+      font-weight: 600;
+    }
+    .matrix-info {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      background: #f9fafb;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-top: 8px;
+      white-space: pre-wrap;
+    }
+    .btn {
+      appearance: none;
+      border: none;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #2563eb;
+      color: white;
+      box-shadow: 0 8px 14px rgba(37,99,235,0.25);
+      transition: all .12s ease-out;
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+    .btn.secondary {
+      background: #e5e7eb;
+      color: #111827;
+      box-shadow: none;
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+      box-shadow: none;
+    }
+    .btn:not(:disabled):hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 20px rgba(37,99,235,0.35);
+    }
+    .btn.secondary:not(:disabled):hover {
+      box-shadow: 0 8px 18px rgba(148,163,184,0.4);
+    }
+    .output-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      height: 150px;
+      padding: 6px 0;
+    }
+    .bar {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 11px;
+    }
+    .bar-inner {
+      width: 100%;
+      border-radius: 999px 999px 4px 4px;
+      background: #d1d5db;
+      transition: height .18s ease-out, background .18s ease-out;
+    }
+    .bar-inner.active {
+      background: #2563eb;
+    }
+    .bar-label {
+      margin-top: 4px;
+    }
+    code {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+    }
+    @media (max-width: 900px) {
+      .flex-row {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>MNIST 手写数字识别 · 矩阵乘法可视化</h1>
+  <p>演示 28×28 图像 → 784×1 向量 → 全连接层矩阵乘法 → 10×1 输出的全过程。</p>
+</header>
+
+<main>
+  <!-- STEP 1: 选择样本 -->
+  <section class="panel">
+    <div class="step-label">Step 1 · 选择一张 MNIST 数字图像</div>
+    <p class="muted">样本来自 MNIST（由离线 Python 脚本生成 <code>mnist_samples.json</code>）。</p>
+    <div id="sampleList" class="sample-list"></div>
+  </section>
+
+  <!-- STEP 2: 28×28 => 784×1 -->
+  <section class="panel">
+    <div class="step-label">Step 2 · 28×28 矩阵展平成 784×1 列向量</div>
+    <div class="flex-row">
+      <div>
+        <div class="pill">原始图像 28×28</div>
+        <canvas id="imageCanvas" width="140" height="140"></canvas>
+      </div>
+      <div class="arrow">→</div>
+      <div>
+        <div class="pill">展平后的列向量 x ∈ ℝ^(784×1)</div>
+        <canvas id="flatCanvas" width="30" height="220"></canvas>
+        <p class="muted" style="max-width:260px;">
+          展平方式：按 <span class="highlight">列</span> 展平（column-major）。<br>
+          即：先拿第 1 列从上到下排成一段，再接第 2 列，以此类推。
+        </p>
+      </div>
+    </div>
+  </section>
+
+    <!-- 放在 Step 3 前面 -->
+  <section class="panel">
+    <div class="step-label">STEP 3 · 权重模式</div>
+    <p class="muted">
+      选择本页面使用的 MLP 权重：<br>
+      - 随机初始化：用于展示「模型还没学会时」的矩阵乘法效果<br>
+      - 训练好的权重：用于展示真实识别效果（来自 <code>mlp_weights.json</code>）
+    </p>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div>
+        <label><input type="radio" name="wmode" value="random" checked> 随机初始化</label><br>
+        <label><input type="radio" name="wmode" value="trained"> 使用训练好的权重</label>
+      </div>
+      <div id="modeTag"
+           style="padding:6px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:12px;">
+        当前：随机初始化权重
+      </div>
+    </div>
+  </section>
+
+
+  <!-- STEP 3: 第一层矩阵乘法 -->
+  <section class="panel">
+    <div class="step-label">Step 4 · 第一层全连接：W₁ · x + b₁</div>
+<p class="muted">
+  第一层维度：<code>W₁ ∈ ℝ^(16×784), b₁ ∈ ℝ^(16)</code>，激活函数 ReLU。<br>
+  当前使用的权重模式见上方「Global · 权重模式」格子。
+</p>
+
+    <button id="btnInit" class="btn">① 初始化/加载权重并计算第一层</button>
+    <button id="btnShowNeuron" class="btn secondary" disabled>② 展示第一个神经元的计算公式</button>
+
+    <div class="flex-row" style="margin-top:12px;">
+      <div>
+        <div class="pill">输入向量 x (784×1)</div>
+        <canvas id="xCanvas" width="30" height="220"></canvas>
+      </div>
+      <div class="arrow">→</div>
+      <div>
+        <div class="pill">权重矩阵 W₁ (16×784)</div>
+        <canvas id="W1Canvas" width="260" height="130"></canvas>
+      </div>
+      <div class="arrow">→</div>
+      <div>
+        <div class="pill">线性输出 W₁x + b₁ (16×1)</div>
+        <canvas id="h1LinearCanvas" width="30" height="130"></canvas>
+        <div class="pill" style="margin-top:8px;">ReLU(h₁)</div>
+        <canvas id="h1ReluCanvas" width="30" height="130"></canvas>
+      </div>
+    </div>
+
+    <div id="layer1Info" class="matrix-info"></div>
+    <div id="neuronInfo" class="matrix-info"></div>
+  </section>
+
+  <!-- STEP 4: 第二层 + 输出 -->
+  <section class="panel">
+    <div class="step-label">Step 5 · 第二层 + 10 维输出（logits & softmax）</div>
+    <p class="muted">
+      第二层：<code>W₂ ∈ ℝ^(10×16), b₂ ∈ ℝ^(10)</code>。<br>
+      <code>z = W₂ · h₁ + b₂, &nbsp; y = softmax(z)</code>，其中 y 的 10 个分量对应数字 0–9 的概率。
+    </p>
+
+    <button id="btnForwardAll" class="btn" disabled>③ 计算第二层并展示最终输出</button>
+
+    <div id="layer2Info" class="matrix-info"></div>
+    <div id="logitsInfo" class="matrix-info"></div>
+
+    <div class="pill" style="margin-top:8px;">Softmax 输出：每个数字的概率柱状图</div>
+    <div id="outputBars" class="output-bars"></div>
+  </section>
+</main>
+
+<script>
+  // ========= 全局状态 =========
+  let mnistSamples = [];
+  let trainedWeights = null;
+  let currentSample = null;
+
+  let W1 = null, b1 = null, W2 = null, b2 = null;
+  let xVector = null;         // 784×1，已归一化
+  let linearH1 = null;        // 未 ReLU 的 16×1
+  let h1 = null;              // ReLU 后的 16×1
+  let logits = null;          // 10×1
+  let probs  = null;          // 10×1
+
+  // ========= 工具函数 =========
+  function relu(x) { return Math.max(0, x); }
+
+  function softmax(vec) {
+    const maxVal = Math.max(...vec);
+    const exps = vec.map(v => Math.exp(v - maxVal));
+    const sum = exps.reduce((a,b) => a + b, 0);
+    return exps.map(v => v / sum);
+  }
+
+  function toGray(v, minVal, maxVal) {
+    if (maxVal === minVal) return 128;
+    const t = (v - minVal) / (maxVal - minVal); // 0..1
+    const g = Math.round(255 * (1 - t));        // 大值 -> 深色
+    return g;
+  }
+
+  // 简单随机权重初始化
+  function initRandomWeights() {
+    const inputDim = 784;
+    const hiddenDim = 16;
+    const outputDim = 10;
+    W1 = new Array(hiddenDim).fill(0).map(
+      () => new Array(inputDim).fill(0).map(() => (Math.random() - 0.5) * 0.2)
+    );
+    b1 = new Array(hiddenDim).fill(0).map(() => (Math.random() - 0.5) * 0.1);
+    W2 = new Array(outputDim).fill(0).map(
+      () => new Array(hiddenDim).fill(0).map(() => (Math.random() - 0.5) * 0.2)
+    );
+    b2 = new Array(outputDim).fill(0).map(() => (Math.random() - 0.5) * 0.1);
+  }
+
+  function updateModeFromUI() {
+    const radios = document.querySelectorAll('input[name="wmode"]');
+    for (const r of radios) {
+      if (r.checked) return r.value;
+    }
+    return 'random';
+  }
+
+function initWeightsDependingOnMode() {
+const mode = updateModeFromUI();
+const modeTag = document.getElementById("modeTag");
+if (mode === 'random') {
+    initRandomWeights();
+    if (modeTag) modeTag.textContent = "当前：随机初始化权重";
+} else {
+    W1 = trainedWeights.W1;
+    b1 = trainedWeights.b1;
+    W2 = trainedWeights.W2;
+    b2 = trainedWeights.b2;
+    if (modeTag) modeTag.textContent = "当前：使用训练好的训练后权重";
+}
+}
+
+  // ========= MNIST 图像绘制 =========
+  function drawImage(sample) {
+    const canvas = document.getElementById("imageCanvas");
+    const ctx = canvas.getContext("2d");
+    const W = sample.width;
+    const H = sample.height;
+    const cell = canvas.width / W;
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for (let i = 0; i < H; i++) {
+      for (let j = 0; j < W; j++) {
+        const idx = i * W + j;
+        const v = sample.pixels[idx]; // 0..255
+        const g = 255 - v; // 白底黑字
+        ctx.fillStyle = `rgb(${g},${g},${g})`;
+        ctx.fillRect(j*cell, i*cell, cell, cell);
+      }
+    }
+  }
+
+  // 按列展平（column-major）
+  function getFlattenColumnMajor(sample) {
+    const { width: W, height: H, pixels } = sample;
+    const x = [];
+    for (let col = 0; col < W; col++) {
+      for (let row = 0; row < H; row++) {
+        const idx = row * W + col;
+        x.push(pixels[idx] / 255.0); // 归一化
+      }
+    }
+    return x; // 长度 784
+  }
+
+  function drawFlatVector(sample) {
+    const canvas = document.getElementById("flatCanvas");
+    const ctx = canvas.getContext("2d");
+    const x = getFlattenColumnMajor(sample);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const n = x.length;
+    for (let k = 0; k < n; k++) {
+      const y = k / n * canvas.height;
+      const h = Math.max(1, canvas.height / n);
+      const g = toGray(x[k], 0, 1);
+      ctx.fillStyle = `rgb(${g},${g},${g})`;
+      ctx.fillRect(0, y, canvas.width, h);
+    }
+  }
+
+  // ========= Step 3 可视化：x, W1, h1 =========
+  function drawXVector() {
+    const canvas = document.getElementById("xCanvas");
+    const ctx = canvas.getContext("2d");
+    const x = xVector;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const n = x.length;
+    for (let k = 0; k < n; k++) {
+      const y = k / n * canvas.height;
+      const h = Math.max(1, canvas.height / n);
+      const g = toGray(x[k], 0, 1);
+      ctx.fillStyle = `rgb(${g},${g},${g})`;
+      ctx.fillRect(0, y, canvas.width, h);
+    }
+  }
+
+  function drawW1Matrix() {
+    const canvas = document.getElementById("W1Canvas");
+    const ctx = canvas.getContext("2d");
+    const rows = W1.length;      // 16
+    const cols = W1[0].length;   // 784
+    let minVal = Infinity, maxVal = -Infinity;
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        const v = W1[i][j];
+        if (v < minVal) minVal = v;
+        if (v > maxVal) maxVal = v;
+      }
+    }
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        const v = W1[i][j];
+        const g = toGray(v, minVal, maxVal);
+        const x = j / cols * canvas.width;
+        const y = i / rows * canvas.height;
+        const w = Math.ceil(canvas.width / cols);
+        const h = Math.ceil(canvas.height / rows);
+        ctx.fillStyle = `rgb(${g},${g},${g})`;
+        ctx.fillRect(x, y, w, h);
+      }
+    }
+  }
+
+  function drawH1LinearAndRelu() {
+    const linearCanvas = document.getElementById("h1LinearCanvas");
+    const reluCanvas   = document.getElementById("h1ReluCanvas");
+    const ctxL = linearCanvas.getContext("2d");
+    const ctxR = reluCanvas.getContext("2d");
+    const rows = linearH1.length;
+
+    const minL = Math.min(...linearH1);
+    const maxL = Math.max(...linearH1);
+    const minR = 0;
+    const maxR = Math.max(...h1) || 1;
+
+    ctxL.clearRect(0,0,linearCanvas.width,linearCanvas.height);
+    ctxR.clearRect(0,0,reluCanvas.width,reluCanvas.height);
+
+    for (let i = 0; i < rows; i++) {
+      const yL = i / rows * linearCanvas.height;
+      const hL = Math.ceil(linearCanvas.height / rows);
+      const gL = toGray(linearH1[i], minL, maxL);
+      ctxL.fillStyle = `rgb(${gL},${gL},${gL})`;
+      ctxL.fillRect(0, yL, linearCanvas.width, hL);
+
+      const yR = i / rows * reluCanvas.height;
+      const hR = Math.ceil(reluCanvas.height / rows);
+      const gR = toGray(h1[i], minR, maxR);
+      ctxR.fillStyle = `rgb(${gR},${gR},${gR})`;
+      ctxR.fillRect(0, yR, reluCanvas.width, hR);
+    }
+  }
+
+  // ========= 前向计算 =========
+  function computeFirstLayer() {
+    xVector = getFlattenColumnMajor(currentSample); // 784×1
+    const hiddenDim = W1.length;
+
+    linearH1 = new Array(hiddenDim).fill(0);
+    h1       = new Array(hiddenDim).fill(0);
+
+    for (let i = 0; i < hiddenDim; i++) {
+      let sum = b1[i];
+      for (let j = 0; j < xVector.length; j++) {
+        sum += W1[i][j] * xVector[j];
+      }
+      linearH1[i] = sum;
+      h1[i] = relu(sum);
+    }
+  }
+
+  function showLayer1Info() {
+    const info = document.getElementById("layer1Info");
+    info.innerHTML =
+      "第一层计算：\n" +
+      "    h₁ = ReLU(W₁ · x + b₁)\n" +
+      "其中：\n" +
+      "    W₁ ∈ ℝ^(16×784),  x ∈ ℝ^(784×1),  b₁ ∈ ℝ^(16×1),  h₁ ∈ ℝ^(16×1)\n"
+  }
+
+  function showFirstNeuronDetail() {
+    const info = document.getElementById("neuronInfo");
+    const terms = [];
+    for (let j = 0; j < 8; j++) {
+      terms.push(`w₁[0,${j}]·x[${j}]`);
+    }
+    const text =
+      "以第一个隐藏神经元 h₁[0] 为例：\n\n" +
+      "    h₁[0] = ReLU(Σ_{j=0}^{783} w₁[0,j] · x[j] + b₁[0])\n\n" +
+      "展开前几项可写成：\n" +
+      "    h₁[0] = ReLU(" + terms.join(" + ") + " + … + b₁[0])";
+    info.textContent = text;
+  }
+
+  function forwardSecondLayer() {
+    const hiddenDim = h1.length;
+    const outputDim = W2.length;
+    logits = new Array(outputDim).fill(0);
+
+    for (let i = 0; i < outputDim; i++) {
+      let sum = b2[i];
+      for (let j = 0; j < hiddenDim; j++) {
+        sum += W2[i][j] * h1[j];
+      }
+      logits[i] = sum;
+    }
+    probs = softmax(logits);
+  }
+
+  function showLayer2Info() {
+    const info = document.getElementById("layer2Info");
+    const logitsInfo = document.getElementById("logitsInfo");
+    info.textContent =
+      "第二层计算：\n" +
+      "    z = W₂ · h₁ + b₂\n" +
+      "    y = softmax(z)\n" +
+      "其中 W₂ ∈ ℝ^(10×16),  b₂ ∈ ℝ^(10×1),  z, y ∈ ℝ^(10×1)。";
+
+    logitsInfo.innerHTML =
+      "logits（未归一化得分）:\n" +
+      "[" + logits.map(v => v.toFixed(3)).join(", ") + "]\n\n" +
+      "softmax 概率:\n" +
+      "[" + probs.map(v => v.toFixed(3)).join(", ") + "]";
+  }
+
+  function showOutputBars() {
+    const container = document.getElementById("outputBars");
+    container.innerHTML = "";
+    const maxP = Math.max(...probs);
+    probs.forEach((p, digit) => {
+      const bar = document.createElement("div");
+      bar.className = "bar";
+
+      const inner = document.createElement("div");
+      inner.className = "bar-inner" + (p === maxP ? " active" : "");
+      inner.style.height = (p * 130 + 4) + "px";
+      bar.appendChild(inner);
+
+      const label = document.createElement("div");
+      label.className = "bar-label";
+      label.textContent = digit.toString();
+      bar.appendChild(label);
+
+      const val = document.createElement("div");
+      val.className = "muted";
+      val.textContent = p.toFixed(2);
+      bar.appendChild(val);
+
+      container.appendChild(bar);
+    });
+  }
+
+  // ========= UI 初始化 =========
+  async function loadData() {
+    const [samplesRes, weightsRes] = await Promise.all([
+      fetch('mnist_samples.json'),
+      fetch('mlp_weights.json')
+    ]);
+    mnistSamples = await samplesRes.json();
+    trainedWeights = await weightsRes.json();
+  }
+
+  function renderSamples() {
+    const list = document.getElementById("sampleList");
+    list.innerHTML = "";
+    mnistSamples.forEach((s, idx) => {
+      const card = document.createElement("div");
+      card.className = "sample-card" + (idx === 0 ? " selected" : "");
+      card.dataset.index = idx;
+
+      const thumbSize = 42;
+      const canvas = document.createElement("canvas");
+      canvas.width = thumbSize;
+      canvas.height = thumbSize;
+      const ctx = canvas.getContext("2d");
+      const W = s.width, H = s.height;
+      const cell = thumbSize / W;
+      for (let i = 0; i < H; i++) {
+        for (let j = 0; j < W; j++) {
+          const idxPix = i * W + j;
+          const v = s.pixels[idxPix];
+          const g = 255 - v;
+          ctx.fillStyle = `rgb(${g},${g},${g})`;
+          ctx.fillRect(j*cell, i*cell, cell, cell);
+        }
+      }
+      card.appendChild(canvas);
+
+      const label = document.createElement("span");
+      label.textContent = `数字 ${s.label}`;
+      card.appendChild(label);
+
+      card.onclick = () => {
+        [...document.querySelectorAll(".sample-card")]
+          .forEach(el => el.classList.remove("selected"));
+        card.classList.add("selected");
+        currentSample = s;
+        drawImage(currentSample);
+        drawFlatVector(currentSample);
+        // 切换样本后：清空后续可视化
+        document.getElementById("layer1Info").textContent = "";
+        document.getElementById("neuronInfo").textContent = "";
+        document.getElementById("layer2Info").textContent = "";
+        document.getElementById("logitsInfo").textContent = "";
+        document.getElementById("outputBars").innerHTML = "";
+      };
+
+      list.appendChild(card);
+    });
+  }
+
+  async function initApp() {
+    await loadData();
+    currentSample = mnistSamples[0];
+
+    renderSamples();
+    drawImage(currentSample);
+    drawFlatVector(currentSample);
+
+    const btnInit = document.getElementById("btnInit");
+    const btnNeuron = document.getElementById("btnShowNeuron");
+    const btnForward = document.getElementById("btnForwardAll");
+
+    btnInit.onclick = () => {
+      initWeightsDependingOnMode();
+      computeFirstLayer();
+      drawFlatVector(currentSample); // Step2 的
+      drawXVector();
+      drawW1Matrix();
+      drawH1LinearAndRelu();
+      showLayer1Info();
+      btnNeuron.disabled = false;
+      btnForward.disabled = false;
+    };
+
+    btnNeuron.onclick = () => {
+      if (!h1) return;
+      showFirstNeuronDetail();
+    };
+
+    btnForward.onclick = () => {
+      if (!h1) return;
+      forwardSecondLayer();
+      showLayer2Info();
+      showOutputBars();
+    };
+
+  // 监听权重模式单选框的变化，仅更新显示，不重新初始化权重
+  const modeRadios = document.querySelectorAll('input[name="wmode"]');
+  const modeTag = document.getElementById("modeTag");
+  modeRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+      const mode = updateModeFromUI();
+      if (!modeTag) return;
+      if (mode === 'random') {
+        modeTag.textContent = "当前：随机初始化权重";
+      } else {
+        modeTag.textContent = "当前：使用训练好的权重";
+      }
+    });
+  });
+
+
+  }
+
+  window.addEventListener('load', () => {
+    initApp().catch(err => {
+      console.error(err);
+      alert("加载 mnist_samples.json 或 mlp_weights.json 失败，请检查文件是否在同一目录。");
+    });
+  });
+</script>
+</body>
+</html>
