@@ -206,20 +206,27 @@
   <!-- STEP 2: 28×28 => 784×1 -->
   <section class="panel">
     <div class="step-label">Step 2 · 28×28 矩阵展平成 784×1 列向量</div>
-    <div class="flex-row">
-      <div>
-        <div class="pill">原始图像 28×28</div>
-        <canvas id="imageCanvas" width="140" height="140"></canvas>
-      </div>
-      <div class="arrow">→</div>
-      <div>
-        <div class="pill">展平后的列向量 x ∈ ℝ^(784×1)</div>
-        <canvas id="flatCanvas" width="30" height="220"></canvas>
-        <p class="muted" style="max-width:260px;">
-          展平方式：按 <span class="highlight">列</span> 展平（column-major）。<br>
-          即：先拿第 1 列从上到下排成一段，再接第 2 列，以此类推。
-        </p>
-      </div>
+        <div class="flex-row">
+        <div>
+            <div class="pill">原始图像 28×28</div>
+            <canvas id="imageCanvas" width="140" height="140"></canvas>
+        </div>
+        <div class="arrow">→</div>
+        <div>
+            <div class="pill">展平后的行向量 (1×784)</div>
+            <canvas id="flatRowCanvas" width="220" height="30"></canvas>
+
+            <div style="height:8px;"></div>
+
+            <div class="pill">作为列向量的 x ∈ ℝ^(784×1)</div>
+            <canvas id="flatCanvas" width="30" height="220"></canvas>
+
+            <p class="muted" style="max-width:260px;">
+            展平方式：按 <span class="highlight">行</span> 展平（row-major）。<br>
+            可先看作 1×784 的行向量，再转置为 784×1 的列向量参与矩阵乘法。
+            </p>
+        </div>
+        </div>
     </div>
   </section>
 
@@ -384,23 +391,34 @@ if (mode === 'random') {
     }
   }
 
-  // 按列展平（column-major）
-  function getFlattenColumnMajor(sample) {
-    const { width: W, height: H, pixels } = sample;
-    const x = [];
+//   // 按列展平（column-major）
+//   function getFlattenColumnMajor(sample) {
+//     const { width: W, height: H, pixels } = sample;
+//     const x = [];
+//     for (let col = 0; col < W; col++) {
+//       for (let row = 0; row < H; row++) {
+//         const idx = row * W + col;
+//         x.push(pixels[idx] / 255.0); // 归一化
+//       }
+//     }
+//     return x; // 长度 784
+//   }
+function getFlattenRowMajor(sample) {
+  const { width: W, height: H, pixels } = sample;
+  const x = [];
+  for (let row = 0; row < H; row++) {
     for (let col = 0; col < W; col++) {
-      for (let row = 0; row < H; row++) {
-        const idx = row * W + col;
-        x.push(pixels[idx] / 255.0); // 归一化
-      }
+      const idx = row * W + col;     // 逐行读像素
+      x.push(pixels[idx] / 255.0);   // 归一化到 0~1
     }
-    return x; // 长度 784
   }
+  return x; // 长度 784
+}
 
   function drawFlatVector(sample) {
     const canvas = document.getElementById("flatCanvas");
     const ctx = canvas.getContext("2d");
-    const x = getFlattenColumnMajor(sample);
+    const x = getFlattenRowMajor(sample);
     ctx.clearRect(0,0,canvas.width,canvas.height);
     const n = x.length;
     for (let k = 0; k < n; k++) {
@@ -411,6 +429,21 @@ if (mode === 'random') {
       ctx.fillRect(0, y, canvas.width, h);
     }
   }
+
+  function drawFlatRowVector(sample) {
+  const canvas = document.getElementById("flatRowCanvas");
+  const ctx = canvas.getContext("2d");
+  const x = getFlattenRowMajor(sample);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const n = x.length;
+  for (let k = 0; k < n; k++) {
+    const xPos = k / n * canvas.width;
+    const w = Math.max(1, canvas.width / n);
+    const g = toGray(x[k], 0, 1);
+    ctx.fillStyle = `rgb(${g},${g},${g})`;
+    ctx.fillRect(xPos, 0, w, canvas.height);
+  }
+}
 
   // ========= Step 3 可视化：x, W1, h1 =========
   function drawXVector() {
@@ -488,7 +521,7 @@ if (mode === 'random') {
 
   // ========= 前向计算 =========
   function computeFirstLayer() {
-    xVector = getFlattenColumnMajor(currentSample); // 784×1
+    xVector = getFlattenRowMajor(currentSample); // 784×1
     const hiddenDim = W1.length;
 
     linearH1 = new Array(hiddenDim).fill(0);
@@ -631,6 +664,7 @@ if (mode === 'random') {
         card.classList.add("selected");
         currentSample = s;
         drawImage(currentSample);
+        drawFlatRowVector(currentSample);
         drawFlatVector(currentSample);
         // 切换样本后：清空后续可视化
         document.getElementById("layer1Info").textContent = "";
@@ -650,6 +684,7 @@ if (mode === 'random') {
 
     renderSamples();
     drawImage(currentSample);
+    drawFlatRowVector(currentSample);
     drawFlatVector(currentSample);
 
     const btnInit = document.getElementById("btnInit");
