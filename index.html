@@ -225,18 +225,21 @@
     <div class="step-label">Step 2 · \( \mathbf{I} \in M_{28 \times 28} (\mathbb{R}) \) 矩阵展平成 \( \mathbf{x} \in M_{784 \times 1} (\mathbb{R}) \) 列向量</div>
         <div class="flex-row">
             <div>
+              <canvas id="imageCanvas" width="140" height="140"></canvas>
                 <div class="pill">原始图像 \( \mathbf{I} \in M_{28 \times 28} (\mathbb{R}) \)</div>
-                <canvas id="imageCanvas" width="140" height="140"></canvas>
+                
             </div>
             <div class="arrow">→</div>
             <div>
+              <canvas id="flatRowCanvas" width="220" height="30"></canvas>
                 <div class="pill">展平后的行向量 \( \mathbf{x}^T \in M_{1 \times 784} (\mathbb{R}) \)</div>
-                <canvas id="flatRowCanvas" width="220" height="30"></canvas>
+                
             </div>
             <div class="arrow">→</div>
             <div>
+              <canvas id="flatCanvas" width="30" height="220"></canvas>
                 <div class="pill">作为列向量的 \( \mathbf{x} \in M_{784 \times 1} (\mathbb{R}) \)</div>
-                <canvas id="flatCanvas" width="30" height="220"></canvas>
+                
             </div>
         </div>
               <p class="muted">
