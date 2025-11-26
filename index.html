@@ -18,11 +18,7 @@
       color: #f9fafb;
       padding: 16px 24px;
     }
-    header h1 {.col {
-      display: flex;
-      flex-direction: column;
-      justify-content: center; /* 垂直居中这一列里的内容 */
-    }
+    header h1 {
       margin: 0 0 4px;
       font-size: 20px;
     }
@@ -36,6 +32,11 @@
       max-width: 1200px;
       margin: 0 auto;
     }
+    .col {
+      display: flex;
+      flex-direction: column;
+      justify-content: center; /* 垂直居中这一列里的内容 */
+    }
     .panel {
       background: white;
       border-radius: 12px;
@@ -47,7 +48,7 @@
       font-size: 13px;
       font-weight: 600;
       color: #6b7280;
-      text-transform: uppercase;
+      /* text-transform: uppercase; */
       letter-spacing: .08em;
       margin-bottom: 4px;
     }
@@ -93,6 +94,9 @@
       border-radius: 8px;
       border: 1px solid #e5e7eb;
       background: white;
+      display: block; 
+      /* center */
+      margin: 0 auto;
     }
     .arrow {
       font-size: 24px;
@@ -109,6 +113,7 @@
       font-weight: 500;
       gap: 4px;
       margin-bottom: 4px;
+      margin-top:8px;
     }
     .highlight {
       color: #2563eb;
@@ -194,11 +199,18 @@
       }
     }
   </style>
+
+    <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 <header>
   <h1>MNIST 手写数字识别 · 矩阵乘法可视化</h1>
-  <p>演示 28×28 图像 → 784×1 向量 → 全连接层矩阵乘法 → 10×1 输出的全过程。</p>
+  <p>演示 \( \mathbf{I} \in M_{28 \times 28} (\mathbb{R}) \) 图像 → \( \mathbf{x} \in M_{784 \times 1} (\mathbb{R}) \) 展开向量 → 全连接层矩阵乘法 → 预测概率 \( \hat{\mathbf{y}} \in M_{10 \times 1} (\mathbb{R}) \) 输出的全过程。</p>
 </header>
 
 <main>
@@ -210,28 +222,27 @@
 
   <!-- STEP 2: 28×28 => 784×1 -->
   <section class="panel">
-    <div class="step-label">Step 2 · 28×28 矩阵展平成 784×1 列向量</div>
+    <div class="step-label">Step 2 · \( \mathbf{I} \in M_{28 \times 28} (\mathbb{R}) \) 矩阵展平成 \( \mathbf{x} \in M_{784 \times 1} (\mathbb{R}) \) 列向量</div>
         <div class="flex-row">
             <div>
-                <div class="pill">原始图像 28×28</div>
+                <div class="pill">原始图像 \( \mathbf{I} \in M_{28 \times 28} (\mathbb{R}) \)</div>
                 <canvas id="imageCanvas" width="140" height="140"></canvas>
             </div>
             <div class="arrow">→</div>
             <div>
-                <div class="pill">展平后的行向量 (1×784)</div>
+                <div class="pill">展平后的行向量 \( \mathbf{x}^T \in M_{1 \times 784} (\mathbb{R}) \)</div>
                 <canvas id="flatRowCanvas" width="220" height="30"></canvas>
             </div>
             <div class="arrow">→</div>
             <div>
-                <div class="pill">作为列向量的 x ∈ ℝ^(784×1)</div>
+                <div class="pill">作为列向量的 \( \mathbf{x} \in M_{784 \times 1} (\mathbb{R}) \)</div>
                 <canvas id="flatCanvas" width="30" height="220"></canvas>
             </div>
         </div>
-    </div>
-                    <p class="muted">
+              <p class="muted">
                 展平方式：按 <span class="highlight">行</span> 展平。<br>
-                可先看作 1×784 的行向量，再转置为 784×1 的列向量参与矩阵乘法。
-                </p>
+                可先看作 \( \mathbf{x}^T \in M_{1 \times 784} (\mathbb{R}) \) 的行向量，再转置为 \( \mathbf{x} \in M_{784 \times 1} (\mathbb{R}) \) 列向量参与矩阵乘法。
+              </p>
   </section>
 
     <!-- 放在 Step 3 前面 -->
@@ -256,9 +267,12 @@
 
   <!-- STEP 3: 第一层矩阵乘法 -->
   <section class="panel">
-    <div class="step-label">Step 4 · 第一层全连接：W₁ · x + b₁</div>
+    <div class="step-label">STEP 4 · 第一层全连接：\( \mathbf{W}_1 \cdot \mathbf{x} + \mathbf{b}_1 \)</div>
 <p class="muted">
-  第一层维度：<code>W₁ ∈ ℝ^(16×784), b₁ ∈ ℝ^(16)</code>，激活函数 ReLU。<br>
+  第一层维度：
+  \( \mathbf{W}_1 \in M_{16 \times 784} (\mathbb{R}) \),
+  \( \mathbf{b}_1 \in M_{16 \times 1} (\mathbb{R}) \), 
+  激活函数 \( \text{ReLU} \)。<br>
 </p>
 
     <button id="btnInit" class="btn">初始化/加载权重并计算第一层</button>
@@ -266,20 +280,25 @@
 
     <div class="flex-row" style="margin-top:12px;">
       <div>
-        <div class="pill">输入向量 x (784×1)</div>
         <canvas id="xCanvas" width="30" height="220"></canvas>
+        <div class="pill">输入向量 \( \mathbf{x} \in M_{784 \times 1} (\mathbb{R}) \)</div>
       </div>
-      <div class="arrow">→</div>
+
       <div>
-        <div class="pill">权重矩阵 W₁ (16×784)</div>
         <canvas id="W1Canvas" width="260" height="130"></canvas>
+        <div class="pill">权重矩阵 \( \mathbf{W}_1 \in M_{16 \times 784} (\mathbb{R}) \)</div>
       </div>
-      <div class="arrow">→</div>
+
       <div>
-        <div class="pill">线性输出 W₁x + b₁ (16×1)</div>
         <canvas id="h1LinearCanvas" width="30" height="130"></canvas>
-        <div class="pill" style="margin-top:8px;">ReLU(h₁)</div>
+        <div class="pill">
+          线性输出 \( \mathbf{h}_1 = \mathbf{W}_1 \cdot \mathbf{x} + \mathbf{b}_1 \in M_{16 \times 1} (\mathbb{R}) \)
+        </div>
+      </div>
+
+      <div>
         <canvas id="h1ReluCanvas" width="30" height="130"></canvas>
+        <div class="pill">\( \text{ReLU}(\mathbf{h}_1) \)</div>
       </div>
     </div>
 
@@ -289,10 +308,13 @@
 
   <!-- STEP 4: 第二层 + 输出 -->
   <section class="panel">
-    <div class="step-label">Step 5 · 第二层 + 10 维输出（logits & softmax）</div>
+    <div class="step-label">STEP 5 · 第二层全连接 + Softmax </div>
     <p class="muted">
-      第二层：<code>W₂ ∈ ℝ^(10×16), b₂ ∈ ℝ^(10)</code>。<br>
-      <code>z = W₂ · h₁ + b₂, &nbsp; y = softmax(z)</code>，其中 y 的 10 个分量对应数字 0–9 的概率。
+      第二层：\( \mathbf{W}_2 \in M_{10 \times 16} (\mathbb{R}) \),
+      \( \mathbf{b}_2 \in M_{10 \times 1} (\mathbb{R}) \)。<br>
+      \( \mathbf{h}_2 = \mathbf{W}_2 \cdot \mathbf{h}_1 + \mathbf{b}_2\) ,
+      \(\hat{\mathbf{y}} = \text{softmax}(\mathbf{h}_2) \)，
+      其中 \( \hat{\mathbf{y}} \) 的 10 个分量对应数字 0–9 的概率。
     </p>
 
     <button id="btnForwardAll" class="btn" disabled>计算第二层并展示最终输出</button>
@@ -369,7 +391,7 @@ if (mode === 'random') {
     b1 = trainedWeights.b1;
     W2 = trainedWeights.W2;
     b2 = trainedWeights.b2;
-    if (modeTag) modeTag.textContent = "当前：使用训练好的训练后权重";
+    if (modeTag) modeTag.textContent = "当前：使用训练好的权重";
 }
 }
 
@@ -539,28 +561,54 @@ function getFlattenRowMajor(sample) {
     }
   }
 
-  function showLayer1Info() {
-    const info = document.getElementById("layer1Info");
-    info.innerHTML =
-      "第一层计算：\n" +
-      "    h₁ = ReLU(W₁ · x + b₁)\n" +
-      "其中：\n" +
-      "    W₁ ∈ ℝ^(16×784),  x ∈ ℝ^(784×1),  b₁ ∈ ℝ^(16×1),  h₁ ∈ ℝ^(16×1)\n"
+function showLayer1Info() {
+  const info = document.getElementById("layer1Info");
+  info.innerHTML = `
+    第一层计算：<br>
+    \\( \\mathbf{h}_1 = \\text{ReLU}(\\mathbf{W}_1 \\cdot \\mathbf{x} + \\mathbf{b}_1) \\)<br>
+    其中：<br>
+    \\( \\mathbf{W}_1 \\in M_{16 \\times 784}(\\mathbb{R}),\\
+      \\mathbf{x} \\in M_{784 \\times 1}(\\mathbb{R}),\\
+      \\mathbf{b}_1 \\in M_{16 \\times 1}(\\mathbb{R}),\\
+      \\mathbf{h}_1 \\in M_{16 \\times 1}(\\mathbb{R}) \\)
+  `;
+
+  // 让 MathJax 重新渲染这一块
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([info]);
+  } else if (window.MathJax && MathJax.typeset) {
+    MathJax.typeset([info]);
+  }
+}
+
+function showFirstNeuronDetail() {
+  const info = document.getElementById("neuronInfo");
+
+  // 前 8 项写成 LaTeX 形式 w_{1}[0,j] x[j]
+  const termsLatex = [];
+  for (let j = 0; j < 8; j++) {
+    termsLatex.push(`\\mathbf{W}_{1}[0,${j}]\\, \\mathbf{x}[${j}]`);
   }
 
-  function showFirstNeuronDetail() {
-    const info = document.getElementById("neuronInfo");
-    const terms = [];
-    for (let j = 0; j < 8; j++) {
-      terms.push(`w₁[0,${j}]·x[${j}]`);
-    }
-    const text =
-      "以第一个隐藏神经元 h₁[0] 为例：\n\n" +
-      "    h₁[0] = ReLU(Σ_{j=0}^{783} w₁[0,j] · x[j] + b₁[0])\n\n" +
-      "展开前几项可写成：\n" +
-      "    h₁[0] = ReLU(" + terms.join(" + ") + " + … + b₁[0])";
-    info.textContent = text;
+  info.innerHTML = `
+    以第一个隐藏神经元 \\( \\mathbf{h}_1[0] \\) 为例：<br><br>
+    \\[
+      \\mathbf{h}_1[0] = \\mathrm{ReLU}\\left( \\sum_{j=0}^{783} \\mathbf{W}_{1}[0,j]\, \\mathbf{x}[j] + \\mathbf{b}_1[0] \\right)
+    \\]
+    展开前几项可写成：<br>
+    \\[
+      \\mathbf{h}_1[0] = \\mathrm{ReLU}\\big( ${termsLatex.join(" + ")} + \\dots + \\mathbf{b}_1[0] \\big)
+    \\]
+  `;
+
+  // 让 MathJax 对这一块重新排版
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([info]);
+  } else if (window.MathJax && MathJax.typeset) {
+    MathJax.typeset([info]);
   }
+}
+
 
   function forwardSecondLayer() {
     const hiddenDim = h1.length;
@@ -577,21 +625,36 @@ function getFlattenRowMajor(sample) {
     probs = softmax(logits);
   }
 
-  function showLayer2Info() {
-    const info = document.getElementById("layer2Info");
-    const logitsInfo = document.getElementById("logitsInfo");
-    info.textContent =
-      "第二层计算：\n" +
-      "    z = W₂ · h₁ + b₂\n" +
-      "    y = softmax(z)\n" +
-      "其中 W₂ ∈ ℝ^(10×16),  b₂ ∈ ℝ^(10×1),  z, y ∈ ℝ^(10×1)。";
+function showLayer2Info() {
+  const info = document.getElementById("layer2Info");
+  const logitsInfo = document.getElementById("logitsInfo");
 
-    logitsInfo.innerHTML =
-      "logits（未归一化得分）:\n" +
-      "[" + logits.map(v => v.toFixed(3)).join(", ") + "]\n\n" +
-      "softmax 概率:\n" +
-      "[" + probs.map(v => v.toFixed(3)).join(", ") + "]";
+  // 上半部分：公式用 MathJax 渲染
+  info.innerHTML = `
+    第二层计算：<br>
+    \\( \\mathbf{h}_2 = \\mathbf{W}_2 \\cdot \\mathbf{h}_1 + \\mathbf{b}_2 \\)<br>
+    \\( \\hat{\\mathbf{y}} = \\mathrm{softmax}(\\mathbf{h}_2) \\)<br>
+    其中：<br>
+    \\( \\mathbf{W}_2 \\in M_{10 \\times 16}(\\mathbb{R}),\\
+      \\mathbf{b}_2 \\in M_{10 \\times 1}(\\mathbb{R}),\\
+      \\mathbf{h}_2, \\hat{\\mathbf{y}} \\in M_{10 \\times 1}(\\mathbb{R}) \\)。
+  `;
+
+  // 触发 MathJax 只重新排版这一块
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([info]);
+  } else if (window.MathJax && MathJax.typeset) {
+    MathJax.typeset([info]);
   }
+
+  // 下半部分：logits 和 softmax 结果，普通文本显示就够了
+  logitsInfo.innerHTML =
+    "    logits（未归一化得分）: " +
+    "[" + logits.map(v => v.toFixed(3)).join(", ") + "]\n\n" +
+    "    softmax 概率: " +
+    "[" + probs.map(v => v.toFixed(3)).join(", ") + "]";
+}
+
 
   function showOutputBars() {
     const container = document.getElementById("outputBars");
