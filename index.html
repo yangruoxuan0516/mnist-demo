@@ -198,6 +198,52 @@
         flex-direction: column;
       }
     }
+    /* ===== 手写弹窗 ===== */
+.modal-overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(17,24,39,0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 9999;
+}
+.modal-overlay.show{ display:flex; }
+
+.modal-dialog{
+  width: min(560px, 100%);
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+  overflow: hidden;
+}
+.modal-header{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.modal-body{
+  padding: 14px;
+}
+#drawCanvas{
+  width: 100%;
+  height: min(55vh, 360px);
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  touch-action: none; /* 关键：防止手机滑动页面打断绘制 */
+}
+.modal-actions{
+  margin-top: 12px;
+  display:flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
   </style>
 
     <script>
@@ -224,6 +270,12 @@
   <section class="panel">
     <div class="step-label">STEP 1 · 选择一张 MNIST 数字图像</div>
     <div id="sampleList" class="sample-list"></div>
+
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <button id="btnCustom" class="btn secondary">或者自己写一个？</button>
+    <span class="muted">支持手机/电脑手写，点击后弹出画布</span>
+  </div>
+
   </section>
 
   <!-- STEP 2: 28×28 => 784×1 -->
@@ -335,6 +387,32 @@
     <div id="outputBars" class="output-bars"></div>
   </section>
 </main>
+
+<!-- 手写弹窗 -->
+<div id="drawModal" class="modal-overlay" aria-hidden="true">
+  <div class="modal-dialog" role="dialog" aria-modal="true" aria-label="手写输入">
+    <div class="modal-header">
+      <div>
+        <div style="font-weight:700;">手写一个数字</div>
+        <div class="muted" style="margin-top:2px;">尽量写在中间，写大一点更准</div>
+      </div>
+      <button id="btnCloseModal" class="btn secondary" style="margin:0;">关闭</button>
+    </div>
+
+    <div class="modal-body">
+      <canvas id="drawCanvas"></canvas>
+
+      <div class="modal-actions">
+        <button id="btnClearDraw" class="btn secondary">清空</button>
+        <button id="btnUploadDraw" class="btn">上传并识别</button>
+      </div>
+
+      <div class="muted" style="font-size:12px;margin-top:8px;">
+        小提示：手机上用手指写；电脑上用鼠标/触控板写。
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
   // ========= 全局状态 =========
@@ -805,6 +883,29 @@ function showLayer2Info() {
   });
 
 
+  const btnCustom = document.getElementById("btnCustom");
+  const btnCloseModal = document.getElementById("btnCloseModal");
+  const btnClearDraw = document.getElementById("btnClearDraw");
+  const btnUploadDraw = document.getElementById("btnUploadDraw");
+
+  btnCustom.onclick = openDrawModal;
+  btnCloseModal.onclick = closeDrawModal;
+  btnClearDraw.onclick = clearDrawCanvas;
+  btnUploadDraw.onclick = uploadAndRecognizeDraw;
+
+  // 点击遮罩关闭（可选）
+  document.getElementById("drawModal").addEventListener("click", (e) => {
+    if (e.target.id === "drawModal") closeDrawModal();
+  });
+
+  // 窗口尺寸变化时，若弹窗打开就重设画布
+  window.addEventListener("resize", () => {
+    const m = document.getElementById("drawModal");
+    if (m.classList.contains("show")) setupDrawCanvas();
+  });
+
+
+
   }
 
   window.addEventListener('load', () => {
@@ -813,6 +914,166 @@ function showLayer2Info() {
       alert("加载 mnist_samples.json 或 mlp_weights.json 失败，请检查文件是否在同一目录。");
     });
   });
+
+  // ===== 手写画布：全局状态 =====
+let drawCtx = null;
+let isDrawing = false;
+let lastPt = null;
+
+// 打开/关闭弹窗
+function openDrawModal() {
+  const m = document.getElementById("drawModal");
+  m.classList.add("show");
+  m.setAttribute("aria-hidden", "false");
+  setupDrawCanvas();   // 每次打开都自适配屏幕尺寸
+}
+
+function closeDrawModal() {
+  const m = document.getElementById("drawModal");
+  m.classList.remove("show");
+  m.setAttribute("aria-hidden", "true");
+}
+
+// 初始化/自适配画布（支持 DPR）
+function setupDrawCanvas() {
+  const c = document.getElementById("drawCanvas");
+  const rect = c.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  // 用 CSS 控制展示尺寸；这里设置真实像素尺寸
+  c.width = Math.floor(rect.width * dpr);
+  c.height = Math.floor(rect.height * dpr);
+
+  drawCtx = c.getContext("2d");
+  drawCtx.setTransform(dpr, 0, 0, dpr, 0, 0); // 用 CSS 像素坐标绘制
+
+  // 白底
+  drawCtx.fillStyle = "#ffffff";
+  drawCtx.fillRect(0, 0, rect.width, rect.height);
+
+  // 画笔风格
+  drawCtx.lineWidth = 18;        // 笔画粗细：你可以调
+  drawCtx.lineCap = "round";
+  drawCtx.lineJoin = "round";
+  drawCtx.strokeStyle = "#111827";
+
+  // 绑定指针事件（鼠标/触摸/手写笔统一）
+  c.onpointerdown = (e) => {
+    isDrawing = true;
+    lastPt = getCanvasPoint(e, c);
+  };
+  c.onpointermove = (e) => {
+    if (!isDrawing) return;
+    const pt = getCanvasPoint(e, c);
+    drawLine(lastPt, pt);
+    lastPt = pt;
+  };
+  c.onpointerup = () => { isDrawing = false; lastPt = null; };
+  c.onpointercancel = () => { isDrawing = false; lastPt = null; };
+}
+
+function getCanvasPoint(e, canvas) {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+function drawLine(a, b) {
+  if (!drawCtx) return;
+  drawCtx.beginPath();
+  drawCtx.moveTo(a.x, a.y);
+  drawCtx.lineTo(b.x, b.y);
+  drawCtx.stroke();
+}
+
+function clearDrawCanvas() {
+  const c = document.getElementById("drawCanvas");
+  const r = c.getBoundingClientRect();
+  if (!drawCtx) return;
+  drawCtx.clearRect(0, 0, r.width, r.height);
+  drawCtx.fillStyle = "#ffffff";
+  drawCtx.fillRect(0, 0, r.width, r.height);
+}
+
+// 把手写画布转换成 28×28 的 MNIST-like pixels（0..255）
+// 关键点：你页面 drawImage 用的是 g = 255 - v（白底黑字显示）
+// 所以这里要把“黑色笔迹”转成高 v（接近 255），白底转成低 v（接近 0）
+function exportDrawToSample28() {
+  const src = document.getElementById("drawCanvas");
+
+  // 1) 缩放到 28×28
+  const tmp = document.createElement("canvas");
+  tmp.width = 28;
+  tmp.height = 28;
+  const tctx = tmp.getContext("2d");
+
+  // 平滑缩放（更像真实图片缩小）
+  tctx.imageSmoothingEnabled = true;
+  tctx.clearRect(0, 0, 28, 28);
+
+  // 把整张画布缩小到 28×28
+  tctx.drawImage(src, 0, 0, 28, 28);
+
+  // 2) 读像素，转灰度并“反相”成 MNIST pixels
+  const img = tctx.getImageData(0, 0, 28, 28).data;
+  const pixels = new Array(28 * 28);
+
+  for (let i = 0; i < 28 * 28; i++) {
+    const r = img[i * 4 + 0];
+    const g = img[i * 4 + 1];
+    const b = img[i * 4 + 2];
+
+    // 灰度：0(黑)~255(白)
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+
+    // 反相：笔迹黑(0) -> v=255；背景白(255) -> v=0
+    let v = Math.round(255 - gray);
+
+    // 轻微阈值，让背景更干净（可调）
+    if (v < 10) v = 0;
+
+    pixels[i] = v;
+  }
+
+  return {
+    width: 28,
+    height: 28,
+    pixels,
+    label: null
+  };
+}
+
+// 用你现有流程“切换样本 + 清空后续 + 重新画 Step2”
+function useCustomSample(sample) {
+  currentSample = sample;
+
+  // 清除 Step1 的选中高亮（避免误导）
+  [...document.querySelectorAll(".sample-card")]
+    .forEach(el => el.classList.remove("selected"));
+
+  // 复用你已有的渲染链
+  drawImage(currentSample);
+  drawFlatRowVector(currentSample);
+  drawFlatVector(currentSample);
+
+  // 清空后续结果
+  document.getElementById("layer1Info").textContent = "";
+  document.getElementById("neuronInfo").textContent = "";
+  document.getElementById("layer2Info").textContent = "";
+  document.getElementById("logitsInfo").textContent = "";
+  document.getElementById("outputBars").innerHTML = "";
+}
+
+// “上传并识别”：转换成 sample，切换 currentSample，然后直接走你按钮逻辑
+function uploadAndRecognizeDraw() {
+  const sample = exportDrawToSample28();
+  useCustomSample(sample);
+  closeDrawModal();
+
+  // 可选：自动触发一次前向（如果你想“点上传就出结果”）
+  // 这里不强制：保持你原来“先初始化权重再算”的教学节奏
+}
+
+
 </script>
 </body>
 </html>
