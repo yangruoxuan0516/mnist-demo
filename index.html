@@ -444,6 +444,32 @@
     return g;
   }
 
+  function dilate28(pixels, iters = 1) {
+  let src = Uint8ClampedArray.from(pixels);
+  const W = 28, H = 28;
+
+  for (let t = 0; t < iters; t++) {
+    const dst = new Uint8ClampedArray(W * H);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let m = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = x + dx, yy = y + dy;
+            if (xx < 0 || xx >= W || yy < 0 || yy >= H) continue;
+            const v = src[yy * W + xx];
+            if (v > m) m = v;
+          }
+        }
+        dst[y * W + x] = m;
+      }
+    }
+    src = dst;
+  }
+  return Array.from(src);
+}
+
+
   // 简单随机权重初始化
   function initRandomWeights() {
     const inputDim = 784;
@@ -951,11 +977,18 @@ function setupDrawCanvas() {
   drawCtx.fillStyle = "#ffffff";
   drawCtx.fillRect(0, 0, rect.width, rect.height);
 
-  // 画笔风格
-  drawCtx.lineWidth = 18;        // 笔画粗细：你可以调
+  // 画笔风格（更像 MNIST：粗 + 边缘灰）
+  const base = 18;
+  drawCtx.lineWidth = base * 2;      // 粗 3 倍
   drawCtx.lineCap = "round";
   drawCtx.lineJoin = "round";
   drawCtx.strokeStyle = "#111827";
+
+  // 灰边：用 shadowBlur 模拟“中间黑、两侧灰”
+  drawCtx.shadowColor = "rgba(17,24,39,0.55)";
+  drawCtx.shadowBlur  = drawCtx.lineWidth * 0.55;  // 可微调 0.4~0.8
+  drawCtx.shadowOffsetX = 0;
+  drawCtx.shadowOffsetY = 0;
 
   // 绑定指针事件（鼠标/触摸/手写笔统一）
   c.onpointerdown = (e) => {
@@ -999,48 +1032,153 @@ function clearDrawCanvas() {
 // 所以这里要把“黑色笔迹”转成高 v（接近 255），白底转成低 v（接近 0）
 function exportDrawToSample28() {
   const src = document.getElementById("drawCanvas");
+  const rect = src.getBoundingClientRect();
 
-  // 1) 缩放到 28×28
-  const tmp = document.createElement("canvas");
-  tmp.width = 28;
-  tmp.height = 28;
-  const tctx = tmp.getContext("2d");
+  // 1) 读原图（用 CSS 像素坐标）
+  const srcW = Math.floor(rect.width);
+  const srcH = Math.floor(rect.height);
 
-  // 平滑缩放（更像真实图片缩小）
-  tctx.imageSmoothingEnabled = true;
-  tctx.clearRect(0, 0, 28, 28);
+  const tmp0 = document.createElement("canvas");
+  tmp0.width = srcW;
+  tmp0.height = srcH;
+  const c0 = tmp0.getContext("2d");
 
-  // 把整张画布缩小到 28×28
-  tctx.drawImage(src, 0, 0, 28, 28);
+  // 把 drawCanvas 画面复制到 tmp0（注意：drawCanvas 内部有 DPR，这里用 drawImage 统一取视觉结果）
+  c0.drawImage(src, 0, 0, srcW, srcH);
 
-  // 2) 读像素，转灰度并“反相”成 MNIST pixels
-  const img = tctx.getImageData(0, 0, 28, 28).data;
-  const pixels = new Array(28 * 28);
+  const img = c0.getImageData(0, 0, srcW, srcH);
+  const data = img.data;
+
+  // 2) 转成“墨迹强度”mask：ink=0..255（背景白 -> 0，笔迹黑 -> 高）
+  const ink = new Uint8ClampedArray(srcW * srcH);
+  for (let i = 0; i < srcW * srcH; i++) {
+    const r = data[i * 4 + 0];
+    const g = data[i * 4 + 1];
+    const b = data[i * 4 + 2];
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b; // 0黑 255白
+    let v = Math.round(255 - gray);                 // 反相：黑->255 白->0
+    if (v < 8) v = 0;                               // 轻阈值去噪
+    ink[i] = v;
+  }
+
+  // 3) 找包围盒 bbox（在原始分辨率上做，效果最好）
+  let minX = srcW, minY = srcH, maxX = -1, maxY = -1;
+  const thr = 18; // bbox阈值：越大越“只认黑中心”，越小越“包含灰边”
+  for (let y = 0; y < srcH; y++) {
+    for (let x = 0; x < srcW; x++) {
+      if (ink[y * srcW + x] > thr) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  // 如果没写到东西，返回全 0
+  if (maxX < 0) {
+    return { width: 28, height: 28, pixels: new Array(28 * 28).fill(0), label: null };
+  }
+
+  // 4) bbox 加 padding（防止裁太死）
+  const boxW = maxX - minX + 1;
+  const boxH = maxY - minY + 1;
+  const pad = Math.round(0.18 * Math.max(boxW, boxH)); // 可调 0.1~0.25
+  minX = Math.max(0, minX - pad);
+  minY = Math.max(0, minY - pad);
+  maxX = Math.min(srcW - 1, maxX + pad);
+  maxY = Math.min(srcH - 1, maxY + pad);
+
+  const cropW = maxX - minX + 1;
+  const cropH = maxY - minY + 1;
+
+  // 5) crop 出 bbox
+  const cropC = document.createElement("canvas");
+  cropC.width = cropW;
+  cropC.height = cropH;
+  const cc = cropC.getContext("2d");
+  cc.drawImage(tmp0, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+
+  // 6) 缩放并放入 28×28：最大边缩到 20（MNIST 常用）
+  const out = document.createElement("canvas");
+  out.width = 28;
+  out.height = 28;
+  const oc = out.getContext("2d");
+
+  // 先白底
+  oc.fillStyle = "#ffffff";
+  oc.fillRect(0, 0, 28, 28);
+
+  const target = 20; // 内容最大边放进 20×20
+  const scale = target / Math.max(cropW, cropH);
+  const newW = Math.max(1, Math.round(cropW * scale));
+  const newH = Math.max(1, Math.round(cropH * scale));
+
+  const dx = Math.floor((28 - newW) / 2);
+  const dy = Math.floor((28 - newH) / 2);
+
+  // 为了更像 MNIST：缩放时开平滑（自然出灰边）
+  oc.imageSmoothingEnabled = true;
+  oc.drawImage(cropC, 0, 0, cropW, cropH, dx, dy, newW, newH);
+
+  // 7) 质心居中（MNIST 风格）：把“墨迹质心”平移到 (14,14)
+  const im2 = oc.getImageData(0, 0, 28, 28);
+  const d2 = im2.data;
+
+  let sum = 0, sumX = 0, sumY = 0;
+  for (let y = 0; y < 28; y++) {
+    for (let x = 0; x < 28; x++) {
+      const idx = (y * 28 + x) * 4;
+      const r = d2[idx], g = d2[idx + 1], b = d2[idx + 2];
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      const v = 255 - gray;     // ink strength
+      if (v > 0) {
+        sum += v;
+        sumX += x * v;
+        sumY += y * v;
+      }
+    }
+  }
+
+  if (sum > 0) {
+    const cx = sumX / sum;
+    const cy = sumY / sum;
+    const shiftX = Math.round(14 - cx);
+    const shiftY = Math.round(14 - cy);
+
+    if (shiftX !== 0 || shiftY !== 0) {
+      const shifted = document.createElement("canvas");
+      shifted.width = 28;
+      shifted.height = 28;
+      const sc = shifted.getContext("2d");
+      sc.fillStyle = "#ffffff";
+      sc.fillRect(0, 0, 28, 28);
+      sc.drawImage(out, shiftX, shiftY);
+
+      // 用平移后的结果替换 out
+      oc.clearRect(0, 0, 28, 28);
+      oc.drawImage(shifted, 0, 0);
+    }
+  }
+
+  // 8) 输出成 MNIST pixels：0..255（笔迹黑->高）
+  const finalImg = oc.getImageData(0, 0, 28, 28).data;
+  let pixels = new Array(28 * 28);
 
   for (let i = 0; i < 28 * 28; i++) {
-    const r = img[i * 4 + 0];
-    const g = img[i * 4 + 1];
-    const b = img[i * 4 + 2];
-
-    // 灰度：0(黑)~255(白)
+    const r = finalImg[i * 4 + 0];
+    const g = finalImg[i * 4 + 1];
+    const b = finalImg[i * 4 + 2];
     const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-
-    // 反相：笔迹黑(0) -> v=255；背景白(255) -> v=0
-    let v = Math.round(255 - gray);
-
-    // 轻微阈值，让背景更干净（可调）
-    if (v < 10) v = 0;
-
+    let v = Math.round(255 - gray);  // 反相：黑->255
+    if (v < 10) v = 0;               // 去背景噪点
     pixels[i] = v;
   }
 
-  return {
-    width: 28,
-    height: 28,
-    pixels,
-    label: null
-  };
+  // pixels = dilate28(pixels, 1);
+  return { width: 28, height: 28, pixels, label: null };
 }
+
 
 // 用你现有流程“切换样本 + 清空后续 + 重新画 Step2”
 function useCustomSample(sample) {
